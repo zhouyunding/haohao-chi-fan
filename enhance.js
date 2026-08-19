@@ -452,27 +452,38 @@ function showShareImageFallback(poster, message, platform) {
   sharePreview.hidden = false;
   copyShareText(message).catch(() => false);
   const platformName = platform === 'wechat' ? '微信' : platform === 'douyin' ? '抖音' : platform === 'qq' ? 'QQ' : '对应 App';
-  shareStatus.textContent = `浏览器无法直接发送图片，请保存图片后打开${platformName}发送`;
+  const pageTip = location.protocol === 'file:' ? '请先打开线上 HTTPS 页面；' : '';
+  shareStatus.textContent = `${pageTip}浏览器无法直接发送图片，请保存图片后打开${platformName}发送`;
 }
 
 async function shareTodayWithImage(target) {
   const message = todayShareMessage(target === 'system' ? 'family' : target);
   shareStatus.textContent = '正在生成包含三餐照片的分享图片...';
+  let poster = null;
   try {
-    const poster = await (sharePosterPromise || buildSharePoster());
+    poster = await (sharePosterPromise || buildSharePoster());
     sharePosterPromise = Promise.resolve(poster);
     const payload = { title: '好好吃饭 · 今日三餐', text: message, files: [poster.file] };
-    if (navigator.share && navigator.canShare?.({ files: payload.files })) {
+    const securePage = location.protocol === 'https:' || location.protocol === 'http:';
+    if (securePage && navigator.share && navigator.canShare?.({ files: payload.files })) {
       await navigator.share(payload);
       shareStatus.textContent = '已打开系统分享面板，请选择微信、抖音或 QQ';
       return;
     }
     showShareImageFallback(poster, message, target);
   } catch (error) {
-    if (error.name !== 'AbortError') {
-      shareStatus.textContent = '图片分享没有成功，请再试一次';
-      sharePosterPromise = null;
+    if (error.name === 'AbortError') {
+      if (poster) showShareImageFallback(poster, message, target);
+      shareStatus.textContent = '系统分享已取消，图片仍可保存后手动发送';
+      return;
     }
+    if (poster) {
+      showShareImageFallback(poster, message, target);
+      shareStatus.textContent = '系统分享被浏览器或 App 拒绝，图片已准备好，请保存后发送';
+    } else {
+      shareStatus.textContent = '图片分享没有成功，请再试一次';
+    }
+    sharePosterPromise = null;
   }
 }
 
