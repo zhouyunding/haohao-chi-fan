@@ -223,7 +223,7 @@ document.querySelector('#save').onclick = () => {
   persistData();
 };
 
-shareButton.addEventListener('click', () => { shareModal.hidden = false; const status = document.querySelector('#shareStatus'); if (status) status.textContent = ''; buzz(); });
+shareButton.addEventListener('click', () => { shareModal.hidden = false; const status = document.querySelector('#shareStatus'); if (status) status.textContent = ''; if (sharePreview) { sharePreview.value = ''; sharePreview.hidden = true; } buzz(); });
 document.querySelector('#shareClose').addEventListener('click', () => { shareModal.hidden = true; });
 shareModal.addEventListener('click', (event) => { if (event.target === shareModal) shareModal.hidden = true; });
 
@@ -331,6 +331,7 @@ document.querySelectorAll('[data-share]').forEach((button) => {
 });
 
 const shareStatus = document.querySelector('#shareStatus');
+const sharePreview = document.querySelector('#sharePreview');
 document.querySelectorAll('[data-share-platform]').forEach((button) => {
   button.addEventListener('click', async () => {
     const platform = button.dataset.sharePlatform;
@@ -348,11 +349,17 @@ document.querySelectorAll('[data-share-platform]').forEach((button) => {
       return;
     }
     const message = todayShareMessage(platform);
+    sharePreview.value = message;
     try {
       const copied = await copyShareText(message);
       shareStatus.textContent = copied
         ? `${platform === 'wechat' ? '微信' : platform === 'douyin' ? '抖音' : 'QQ'}文案已复制，打开对应 App 粘贴发送`
         : '复制失败，请长按下方文字手动复制';
+      sharePreview.hidden = false;
+      if (!copied) {
+        sharePreview.focus();
+        sharePreview.select();
+      }
       if (copied) say('分享文案已复制');
     } catch (error) {
       shareStatus.textContent = '复制失败，请长按下方文字手动复制';

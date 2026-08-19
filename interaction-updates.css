@@ -213,6 +213,23 @@
   text-align: center;
 }
 
+.share-preview {
+  width: 100%;
+  min-height: 72px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #3c3349;
+  border-radius: 5px;
+  background: #100e14;
+  color: #d9d0e5;
+  font: 500 10px/1.55 var(--cute);
+  resize: vertical;
+}
+
+.share-preview:not([hidden]) {
+  display: block;
+}
+
 .cooking-oil-control {
   margin-top: 14px;
   padding-top: 12px;
