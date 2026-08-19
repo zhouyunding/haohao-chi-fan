@@ -442,6 +442,7 @@ const sharePreview = document.querySelector('#sharePreview');
 const shareImageWrap = document.querySelector('#shareImageWrap');
 const shareImagePreview = document.querySelector('#shareImagePreview');
 const shareImageDownload = document.querySelector('#shareImageDownload');
+const saveShareImage = document.querySelector('#saveShareImage');
 let sharePosterPromise = null;
 
 function showShareImageFallback(poster, message, platform) {
@@ -453,7 +454,9 @@ function showShareImageFallback(poster, message, platform) {
   copyShareText(message).catch(() => false);
   const platformName = platform === 'wechat' ? '微信' : platform === 'douyin' ? '抖音' : platform === 'qq' ? 'QQ' : '对应 App';
   const pageTip = location.protocol === 'file:' ? '请先打开线上 HTTPS 页面；' : '';
-  shareStatus.textContent = `${pageTip}浏览器无法直接发送图片，请保存图片后打开${platformName}发送`;
+  shareStatus.textContent = platform === 'save'
+    ? '分享图片已生成，点击图片下方按钮保存到相册'
+    : `${pageTip}浏览器无法直接发送图片，请保存图片后打开${platformName}发送`;
 }
 
 async function shareTodayWithImage(target) {
@@ -493,6 +496,18 @@ document.querySelectorAll('[data-share]').forEach((button) => {
 
 document.querySelectorAll('[data-share-platform]').forEach((button) => {
   button.addEventListener('click', () => shareTodayWithImage(button.dataset.sharePlatform));
+});
+
+saveShareImage?.addEventListener('click', async () => {
+  shareStatus.textContent = '正在生成可保存的分享图片...';
+  try {
+    const poster = await (sharePosterPromise || buildSharePoster());
+    sharePosterPromise = Promise.resolve(poster);
+    showShareImageFallback(poster, todayShareMessage('family'), 'save');
+    shareImageDownload.focus();
+  } catch (error) {
+    shareStatus.textContent = '图片生成失败，请再试一次';
+  }
 });
 
 renderCal = renderCuteCalendar;

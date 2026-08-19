@@ -292,6 +292,47 @@
   text-decoration: none;
 }
 
+.save-share-action {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 7px 11px;
+  border: 1px solid #4b3a67;
+  border-radius: 5px;
+  background: #211a2d;
+  color: #f2edf8;
+  text-align: left;
+}
+
+.save-share-action:active {
+  background: #2b2140;
+  transform: scale(.985);
+}
+
+.save-share-action > span {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #a78bfa;
+  color: #17131d;
+  font: 800 15px var(--cute);
+}
+
+.save-share-action strong {
+  font: 700 11px var(--cute);
+}
+
+.save-share-action small {
+  color: #9388a3;
+  font: 500 8px var(--cute);
+}
+
 .cooking-oil-control {
   margin-top: 14px;
   padding-top: 12px;
