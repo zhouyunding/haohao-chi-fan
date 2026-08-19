@@ -1,0 +1,156 @@
+.category-segment {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.category-segment [data-calc-category="custom"] {
+  grid-column: span 2;
+}
+
+.custom-food-editor {
+  margin-top: 15px;
+  padding: 13px;
+  border: 1px solid #342e3d;
+  border-radius: 4px;
+  background: #17141c;
+}
+
+.custom-food-editor[hidden],
+.food-field[hidden] {
+  display: none;
+}
+
+.custom-food-grid,
+.custom-energy-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.custom-food-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.custom-energy-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(112px, .75fr);
+  margin-top: 12px;
+}
+
+.calc-input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #373140;
+  border-radius: 3px;
+  background: #100e14;
+  color: #eeeaf4;
+  padding: 0 10px;
+  outline: none;
+  font: 500 10px var(--cute);
+}
+
+.calc-input::placeholder {
+  color: #5f5868;
+}
+
+.calc-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px #8b5cf61d;
+}
+
+.custom-kcal-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border: 1px solid #373140;
+  border-radius: 3px;
+  background: #100e14;
+}
+
+.custom-kcal-input .calc-input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.custom-kcal-input span {
+  padding-right: 9px;
+  color: #746c7e;
+  font: 500 8px var(--cute);
+}
+
+.unit-segment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.unit-segment .segment-btn {
+  min-height: 40px;
+}
+
+.add-calorie.is-disabled {
+  background: #28232f;
+  color: #6f6878;
+  box-shadow: none;
+}
+
+.more-menu {
+  position: absolute;
+  top: 51px;
+  right: 12px;
+  z-index: 25;
+  width: 205px;
+  padding: 6px;
+  border: 1px solid #36303f;
+  border-radius: 5px;
+  background: #151219f5;
+  box-shadow: 0 18px 45px #000a;
+  backdrop-filter: blur(18px);
+  transform: translateY(-7px) scale(.97);
+  transform-origin: top right;
+  opacity: 0;
+  transition: opacity .18s ease, transform .22s cubic-bezier(.16, 1, .3, 1);
+}
+
+.more-menu[hidden] {
+  display: none;
+}
+
+.more-menu.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.more-menu button {
+  width: 100%;
+  min-height: 43px;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  text-align: left;
+  border-radius: 3px;
+  background: transparent;
+  color: #c9c3d0;
+  padding: 7px 9px;
+  font: 500 10px var(--cute);
+}
+
+.more-menu button:active {
+  background: #241e2c;
+  color: #fff;
+}
+
+.more-menu button + button {
+  border-top: 1px solid #29242f;
+}
+
+.more-menu .more-icon {
+  color: #a78bfa;
+  font-size: 15px;
+  text-align: center;
+}
+
+@media (max-width: 360px) {
+  .custom-food-grid,
+  .custom-energy-grid {
+    grid-template-columns: 1fr;
+  }
+}
