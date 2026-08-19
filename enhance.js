@@ -223,7 +223,16 @@ document.querySelector('#save').onclick = () => {
   persistData();
 };
 
-shareButton.addEventListener('click', () => { shareModal.hidden = false; const status = document.querySelector('#shareStatus'); if (status) status.textContent = ''; if (sharePreview) { sharePreview.value = ''; sharePreview.hidden = true; } buzz(); });
+shareButton.addEventListener('click', () => {
+  shareModal.hidden = false;
+  const status = document.querySelector('#shareStatus');
+  if (status) status.textContent = '正在整理今日照片...';
+  if (sharePreview) { sharePreview.value = ''; sharePreview.hidden = true; }
+  if (shareImageWrap) shareImageWrap.hidden = true;
+  sharePosterPromise = buildSharePoster();
+  sharePosterPromise.then(() => { if (!shareModal.hidden) status.textContent = '分享图片已准备好'; }).catch(() => { status.textContent = '图片生成失败，请再试一次'; });
+  buzz();
+});
 document.querySelector('#shareClose').addEventListener('click', () => { shareModal.hidden = true; });
 shareModal.addEventListener('click', (event) => { if (event.target === shareModal) shareModal.hidden = true; });
 
@@ -256,6 +265,119 @@ async function copyShareText(message) {
   const copied = document.execCommand('copy');
   textarea.remove();
   return copied;
+}
+
+function loadShareImage(source) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = source;
+  });
+}
+
+function drawCover(context, image, x, y, width, height) {
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  context.save();
+  context.beginPath();
+  context.rect(x, y, width, height);
+  context.clip();
+  context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+  context.restore();
+}
+
+function drawWrappedText(context, text, x, y, maxWidth, lineHeight, maxLines = 2) {
+  let line = '';
+  let lineIndex = 0;
+  for (const character of text) {
+    const next = line + character;
+    if (context.measureText(next).width > maxWidth && line) {
+      context.fillText(line, x, y + lineIndex * lineHeight);
+      lineIndex += 1;
+      line = character;
+      if (lineIndex >= maxLines) return;
+    } else {
+      line = next;
+    }
+  }
+  if (lineIndex < maxLines) context.fillText(line, x, y + lineIndex * lineHeight);
+}
+
+async function buildSharePoster() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1440;
+  const context = canvas.getContext('2d');
+  const records = diaryRecords['2026-08-19'] || {};
+  context.fillStyle = '#0f0c14';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#8b5cf6';
+  context.fillRect(0, 0, 18, canvas.height);
+  context.fillStyle = '#c4a7ff';
+  context.font = '700 28px "Microsoft YaHei", Arial, sans-serif';
+  context.fillText('DAILY MEAL ARCHIVE', 72, 92);
+  context.fillStyle = '#ffffff';
+  context.font = '800 76px "Microsoft YaHei", Arial, sans-serif';
+  context.fillText('好好吃饭', 72, 182);
+  context.fillStyle = '#8f879b';
+  context.font = '500 27px "Microsoft YaHei", Arial, sans-serif';
+  context.fillText('2026.08.19  ·  今天的三餐记录', 72, 232);
+
+  for (let index = 0; index < mealOrder.length; index += 1) {
+    const meal = mealOrder[index];
+    const record = records[meal];
+    const top = 290 + index * 330;
+    context.fillStyle = '#1a1620';
+    context.fillRect(60, top, 960, 286);
+    context.fillStyle = index === 0 ? '#a78bfa' : index === 1 ? '#ec4899' : '#52d3c7';
+    context.fillRect(60, top, 8, 286);
+    const photos = record
+      ? (Array.isArray(record.photos) && record.photos.length ? record.photos : record.photo ? [record.photo] : [])
+      : [];
+    const visiblePhotos = photos.slice(0, 2);
+    if (visiblePhotos.length) {
+      const images = await Promise.all(visiblePhotos.map(loadShareImage));
+      images.forEach((image, photoIndex) => {
+        if (!image) return;
+        const photoWidth = visiblePhotos.length > 1 ? 205 : 420;
+        drawCover(context, image, 88 + photoIndex * 215, top + 28, photoWidth, 230);
+      });
+    } else {
+      context.fillStyle = '#25202c';
+      context.fillRect(88, top + 28, 420, 230);
+      context.fillStyle = '#665e70';
+      context.font = '700 54px "Microsoft YaHei", Arial, sans-serif';
+      context.fillText(String(index + 1).padStart(2, '0'), 260, top + 165);
+    }
+    context.fillStyle = '#a39aaa';
+    context.font = '700 24px "Microsoft YaHei", Arial, sans-serif';
+    context.fillText(mealLabels[meal], 550, top + 58);
+    context.fillStyle = '#f6f2fa';
+    context.font = '700 34px "Microsoft YaHei", Arial, sans-serif';
+    drawWrappedText(context, record?.title || '暂未记录', 550, top + 112, 410, 46, 2);
+    context.fillStyle = '#8f879b';
+    context.font = '500 23px "Microsoft YaHei", Arial, sans-serif';
+    const detail = record?.calories ? `约 ${record.calories} kcal` : (record?.note || '等待下一餐');
+    drawWrappedText(context, detail, 550, top + 218, 410, 34, 2);
+  }
+
+  const totalCalories = mealOrder.reduce((sum, meal) => sum + (Number(records[meal]?.calories) || 0), 0);
+  context.fillStyle = '#8f879b';
+  context.font = '500 24px "Microsoft YaHei", Arial, sans-serif';
+  context.fillText('照片与文字，建立自己的每日饮食档案。', 72, 1342);
+  context.fillStyle = '#c4a7ff';
+  context.font = '700 27px "Microsoft YaHei", Arial, sans-serif';
+  context.fillText(totalCalories ? `今日已记录约 ${totalCalories} KCAL` : '好好吃饭 · DAILY INTAKE', 72, 1390);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+  if (!blob) throw new Error('Poster generation failed');
+  return {
+    blob,
+    file: new File([blob], '好好吃饭-今日三餐.jpg', { type: 'image/jpeg' }),
+    dataUrl: canvas.toDataURL('image/jpeg', 0.9)
+  };
 }
 
 const moreButton = document.querySelector('.topbar .round:last-child');
@@ -315,56 +437,51 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !moreMenu.hidden) closeMoreMenu();
 });
 
-document.querySelectorAll('[data-share]').forEach((button) => {
-  button.addEventListener('click', async () => {
-    const target = button.dataset.share;
-    const message = todayShareMessage(target);
-    try {
-      if (navigator.share) await navigator.share({ title: '好好吃饭', text: message });
-      else if (await copyShareText(message)) say('今日摘要已复制，可以发出去啦');
-      else say('复制失败，请长按文案手动复制');
-    } catch (error) {
-      if (error.name !== 'AbortError') say('分享没成功，再试一次吧');
-    }
-    shareModal.hidden = true;
-  });
-});
-
 const shareStatus = document.querySelector('#shareStatus');
 const sharePreview = document.querySelector('#sharePreview');
-document.querySelectorAll('[data-share-platform]').forEach((button) => {
-  button.addEventListener('click', async () => {
-    const platform = button.dataset.sharePlatform;
-    if (platform === 'system') {
-      try {
-        if (navigator.share) {
-          await navigator.share({ title: '好好吃饭', text: todayShareMessage('family') });
-          shareStatus.textContent = '已打开系统分享面板';
-        } else if (await copyShareText(todayShareMessage('family'))) {
-          shareStatus.textContent = '当前浏览器不支持系统面板，文案已复制';
-        }
-      } catch (error) {
-        if (error.name !== 'AbortError') shareStatus.textContent = '系统分享没有打开，请再试一次';
-      }
+const shareImageWrap = document.querySelector('#shareImageWrap');
+const shareImagePreview = document.querySelector('#shareImagePreview');
+const shareImageDownload = document.querySelector('#shareImageDownload');
+let sharePosterPromise = null;
+
+function showShareImageFallback(poster, message, platform) {
+  shareImagePreview.src = poster.dataUrl;
+  shareImageDownload.href = poster.dataUrl;
+  shareImageWrap.hidden = false;
+  sharePreview.value = message;
+  sharePreview.hidden = false;
+  copyShareText(message).catch(() => false);
+  const platformName = platform === 'wechat' ? '微信' : platform === 'douyin' ? '抖音' : platform === 'qq' ? 'QQ' : '对应 App';
+  shareStatus.textContent = `浏览器无法直接发送图片，请保存图片后打开${platformName}发送`;
+}
+
+async function shareTodayWithImage(target) {
+  const message = todayShareMessage(target === 'system' ? 'family' : target);
+  shareStatus.textContent = '正在生成包含三餐照片的分享图片...';
+  try {
+    const poster = await (sharePosterPromise || buildSharePoster());
+    sharePosterPromise = Promise.resolve(poster);
+    const payload = { title: '好好吃饭 · 今日三餐', text: message, files: [poster.file] };
+    if (navigator.share && navigator.canShare?.({ files: payload.files })) {
+      await navigator.share(payload);
+      shareStatus.textContent = '已打开系统分享面板，请选择微信、抖音或 QQ';
       return;
     }
-    const message = todayShareMessage(platform);
-    sharePreview.value = message;
-    try {
-      const copied = await copyShareText(message);
-      shareStatus.textContent = copied
-        ? `${platform === 'wechat' ? '微信' : platform === 'douyin' ? '抖音' : 'QQ'}文案已复制，打开对应 App 粘贴发送`
-        : '复制失败，请长按下方文字手动复制';
-      sharePreview.hidden = false;
-      if (!copied) {
-        sharePreview.focus();
-        sharePreview.select();
-      }
-      if (copied) say('分享文案已复制');
-    } catch (error) {
-      shareStatus.textContent = '复制失败，请长按下方文字手动复制';
+    showShareImageFallback(poster, message, target);
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      shareStatus.textContent = '图片分享没有成功，请再试一次';
+      sharePosterPromise = null;
     }
-  });
+  }
+}
+
+document.querySelectorAll('[data-share]').forEach((button) => {
+  button.addEventListener('click', () => shareTodayWithImage(button.dataset.share));
+});
+
+document.querySelectorAll('[data-share-platform]').forEach((button) => {
+  button.addEventListener('click', () => shareTodayWithImage(button.dataset.sharePlatform));
 });
 
 renderCal = renderCuteCalendar;

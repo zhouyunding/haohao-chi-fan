@@ -176,6 +176,12 @@
   line-height: 1.6;
 }
 
+.share-sheet {
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .share-platforms {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -251,6 +257,39 @@
 
 .share-preview:not([hidden]) {
   display: block;
+}
+
+.share-image-wrap {
+  position: relative;
+  margin-top: 12px;
+  padding: 7px;
+  border: 1px solid #3c3349;
+  border-radius: 6px;
+  background: #100e14;
+}
+
+.share-image-wrap[hidden] {
+  display: none;
+}
+
+.share-image-wrap img {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.share-image-wrap a {
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  margin-top: 7px;
+  border-radius: 4px;
+  background: #8b5cf6;
+  color: #fff;
+  font: 700 10px var(--cute);
+  text-decoration: none;
 }
 
 .cooking-oil-control {
