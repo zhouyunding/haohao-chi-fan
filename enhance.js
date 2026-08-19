@@ -166,9 +166,40 @@ document.querySelector('#save').onclick = () => {
   renderCuteCalendar();
 };
 
-shareButton.addEventListener('click', () => { shareModal.hidden = false; buzz(); });
+shareButton.addEventListener('click', () => { shareModal.hidden = false; const status = document.querySelector('#shareStatus'); if (status) status.textContent = ''; buzz(); });
 document.querySelector('#shareClose').addEventListener('click', () => { shareModal.hidden = true; });
 shareModal.addEventListener('click', (event) => { if (event.target === shareModal) shareModal.hidden = true; });
+
+function todayShareMessage(style = 'family') {
+  const records = diaryRecords['2026-08-19'] || {};
+  const meals = mealOrder.filter((meal) => records[meal]).map((meal) => {
+    const record = records[meal];
+    const kcal = record.calories ? `（约${record.calories} kcal）` : '';
+    return `${mealLabels[meal]}：${record.title || '已记录'}${kcal}`;
+  }).join('；');
+  const body = meals || '今天暂未添加记录。';
+  if (style === 'douyin') return `我的今日饮食记录｜好好吃饭\n${body}\n把每一餐认真记下来，慢慢吃，也好好生活。`;
+  if (style === 'qq') return `好好吃饭 · 今日三餐\n${body}\n一起监督，按自己的节奏好好吃饭。`;
+  if (style === 'buddy') return `今日饮食进度：${body}`;
+  return `今日饮食记录：${body}`;
+}
+
+async function copyShareText(message) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(message);
+    return true;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = message;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  return copied;
+}
 
 const moreButton = document.querySelector('.topbar .round:last-child');
 const moreMenu = document.createElement('div');
@@ -230,19 +261,45 @@ document.addEventListener('keydown', (event) => {
 document.querySelectorAll('[data-share]').forEach((button) => {
   button.addEventListener('click', async () => {
     const target = button.dataset.share;
-    const records = diaryRecords['2026-08-19'];
-    const meals = mealOrder.filter((meal) => records[meal]).map((meal) => `${mealLabels[meal]}：${records[meal].title}`).join('；');
-    const message = target === 'family'
-      ? `今日饮食记录：${meals || '今天暂未添加记录。'}`
-      : `今日饮食进度：${meals || '今天暂未完成记录。'}`;
+    const message = todayShareMessage(target);
     try {
       if (navigator.share) await navigator.share({ title: '好好吃饭', text: message });
-      else if (navigator.clipboard) { await navigator.clipboard.writeText(message); say('今日摘要已复制，可以发出去啦'); }
-      else say(target === 'family' ? '已经整理好给家人的三餐摘要' : '已经整理好监督打卡摘要');
+      else if (await copyShareText(message)) say('今日摘要已复制，可以发出去啦');
+      else say('复制失败，请长按文案手动复制');
     } catch (error) {
       if (error.name !== 'AbortError') say('分享没成功，再试一次吧');
     }
     shareModal.hidden = true;
+  });
+});
+
+const shareStatus = document.querySelector('#shareStatus');
+document.querySelectorAll('[data-share-platform]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const platform = button.dataset.sharePlatform;
+    if (platform === 'system') {
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: '好好吃饭', text: todayShareMessage('family') });
+          shareStatus.textContent = '已打开系统分享面板';
+        } else if (await copyShareText(todayShareMessage('family'))) {
+          shareStatus.textContent = '当前浏览器不支持系统面板，文案已复制';
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') shareStatus.textContent = '系统分享没有打开，请再试一次';
+      }
+      return;
+    }
+    const message = todayShareMessage(platform);
+    try {
+      const copied = await copyShareText(message);
+      shareStatus.textContent = copied
+        ? `${platform === 'wechat' ? '微信' : platform === 'douyin' ? '抖音' : 'QQ'}文案已复制，打开对应 App 粘贴发送`
+        : '复制失败，请长按下方文字手动复制';
+      if (copied) say('分享文案已复制');
+    } catch (error) {
+      shareStatus.textContent = '复制失败，请长按下方文字手动复制';
+    }
   });
 });
 
@@ -319,6 +376,7 @@ const calorieState = {
   category: 'staple',
   food: '米饭',
   weight: 150,
+  cookingOil: 0,
   customCategory: '',
   customFood: '',
   customPer100: 100,
@@ -364,15 +422,16 @@ function setupCalorieCalculator() {
     <div class="calculator-divider"></div>
     <label class="calc-label">MEAL</label><div class="meal-segment" id="mealSegment"><button class="segment-btn is-active" data-calc-meal="breakfast">早餐</button><button class="segment-btn" data-calc-meal="lunch">午餐</button><button class="segment-btn" data-calc-meal="dinner">晚餐</button></div>
     <label class="calc-label" style="margin-top:15px">FOOD TYPE</label><div class="category-segment" id="categorySegment">${Object.entries(calorieLabels).map(([key, label], index) => `<button class="segment-btn${index === 0 ? ' is-active' : ''}" data-calc-category="${key}">${label}</button>`).join('')}</div>
-    <div class="food-field" id="presetFoodField"><label class="calc-label">FOOD</label><select class="food-select" id="foodSelect"></select><div class="food-meta"><span id="foodPer100">每 100g</span><span>估算值</span></div></div>
+    <div class="food-field" id="presetFoodField"><label class="calc-label">FOOD</label><select class="food-select" id="foodSelect"></select><div class="food-meta"><span id="foodPer100">每 100g</span><span>常见熟重</span></div></div>
     <div class="custom-food-editor" id="customFoodEditor" hidden>
       <div class="custom-food-grid"><label><span class="calc-label">食物类型</span><input class="calc-input" id="customCategoryInput" type="text" maxlength="16" placeholder="例如：零食、汤品"></label><label><span class="calc-label">食物名称</span><input class="calc-input" id="customFoodInput" type="text" maxlength="24" placeholder="例如：曲奇饼干"></label></div>
       <div class="custom-energy-grid"><label><span class="calc-label">每 100 单位热量</span><div class="custom-kcal-input"><input class="calc-input" id="customPer100Input" type="number" min="1" max="2000" step="1" value="100"><span>KCAL</span></div></label><div><span class="calc-label">计量单位</span><div class="unit-segment"><button type="button" class="segment-btn is-active" data-custom-unit="g">克</button><button type="button" class="segment-btn" data-custom-unit="ml">毫升</button></div></div></div>
       <div class="food-meta"><span id="customFoodPer100">每 100g ≈ 100 kcal</span><span>由你填写</span></div>
     </div>
     <div class="weight-control"><div class="weight-line"><label class="calc-label" style="margin:0">WEIGHT</label><span class="weight-unit">克 / 毫升</span></div><div class="weight-stepper"><button type="button" id="weightMinus">−</button><input id="weightInput" type="number" min="1" max="2000" step="10" value="150"><button type="button" id="weightPlus">＋</button></div><input class="weight-range" id="weightRange" type="range" min="10" max="800" step="10" value="150"></div>
+    <div class="cooking-oil-control" id="cookingOilControl"><div class="oil-line"><label class="calc-label" style="margin:0">COOKING OIL</label><div class="oil-input-wrap"><input class="oil-input" id="oilInput" type="number" min="0" max="100" step="1" value="0" inputmode="decimal"><span class="oil-unit">g · 约 9 kcal/g</span></div></div><small class="oil-note">如果这餐用了炒菜油、橄榄油或沙拉酱，按实际用量补充。</small></div>
     <div class="estimate-row"><div class="estimate-copy"><span>ESTIMATED CALORIES</span><strong id="estimateKcal">174</strong><small> KCAL</small></div><button class="add-calorie" id="addCalorie" type="button">加入今日记录</button></div>
-    <p class="calorie-disclaimer">热量是基于常见食材的估算值，烹饪方式和调味会产生差异。</p>
+    <p class="calorie-disclaimer">基础值按常见熟重或可食部分估算，包装食品以营养标签为准，烹饪油单独计入。</p><p class="calorie-basis">建议称熟后的可食部分；外卖、酱汁和复合菜会有约 10-25% 浮动。</p>
     <div class="calorie-log"><div class="calorie-log-head"><strong>今日已添加</strong><span id="logCount">0 项</span></div><div id="calorieLog"><div class="calorie-empty">还没有热量记录。</div></div></div>`;
 
   const mealButtons = panel.querySelectorAll('[data-calc-meal]');
@@ -387,6 +446,8 @@ function setupCalorieCalculator() {
   const customUnitButtons = panel.querySelectorAll('[data-custom-unit]');
   const weightInput = panel.querySelector('#weightInput');
   const weightRange = panel.querySelector('#weightRange');
+  const oilInput = panel.querySelector('#oilInput');
+  const oilControl = panel.querySelector('#cookingOilControl');
   const estimateKcal = panel.querySelector('#estimateKcal');
   const foodPer100 = panel.querySelector('#foodPer100');
   const totalEl = panel.querySelector('#calorieTotal');
@@ -444,8 +505,10 @@ function setupCalorieCalculator() {
   function renderEstimate() {
     const [name, per100] = currentFood();
     const weight = Math.max(1, Number(weightInput.value) || 1);
-    const kcal = Math.round(per100 * weight / 100);
+    const oil = calorieState.category === 'drink' ? 0 : Math.max(0, Number(oilInput.value) || 0);
+    const kcal = Math.round(per100 * weight / 100 + oil * 9);
     estimateKcal.textContent = kcal;
+    oilControl.hidden = calorieState.category === 'drink';
     if (calorieState.category === 'custom') {
       customFoodPer100.textContent = per100
         ? `每 100${currentUnit()} ≈ ${per100} kcal`
@@ -455,6 +518,7 @@ function setupCalorieCalculator() {
       foodPer100.textContent = `每 100${currentUnit()} ≈ ${per100} kcal`;
     }
     calorieState.weight = weight;
+    calorieState.cookingOil = oil;
     calorieState.food = name;
     updateAddState();
   }
@@ -498,7 +562,7 @@ function setupCalorieCalculator() {
       logContainer.innerHTML = '<div class="calorie-empty">还没有热量记录。</div>';
       return;
     }
-    logContainer.innerHTML = calorieState.log.map((item, index) => `<div class="calorie-entry"><div><strong>${mealLabels[item.meal]} · ${item.food}</strong><small>${item.category} · ${item.weight}${item.unit}</small></div><b>${item.kcal}</b><button class="calorie-remove" type="button" data-remove-calorie="${index}">×</button></div>`).join('');
+    logContainer.innerHTML = calorieState.log.map((item, index) => `<div class="calorie-entry"><div><strong>${mealLabels[item.meal]} · ${item.food}</strong><small>${item.category} · ${item.weight}${item.unit}${item.oil ? ` + ${item.oil}g油` : ''}</small></div><b>${item.kcal}</b><button class="calorie-remove" type="button" data-remove-calorie="${index}">×</button></div>`).join('');
     logContainer.querySelectorAll('[data-remove-calorie]').forEach((button) => button.addEventListener('click', () => {
       calorieState.log.splice(Number(button.dataset.removeCalorie), 1);
       renderLog();
@@ -527,6 +591,7 @@ function setupCalorieCalculator() {
   }));
   weightInput.addEventListener('input', () => { weightRange.value = weightInput.value; renderEstimate(); });
   weightRange.addEventListener('input', () => { weightInput.value = weightRange.value; renderEstimate(); });
+  oilInput.addEventListener('input', () => { calorieState.cookingOil = Math.max(0, Number(oilInput.value) || 0); renderEstimate(); });
   panel.querySelector('#weightMinus').addEventListener('click', () => { weightInput.value = Math.max(10, Number(weightInput.value) - 10); weightRange.value = weightInput.value; renderEstimate(); });
   panel.querySelector('#weightPlus').addEventListener('click', () => { weightInput.value = Math.min(2000, Number(weightInput.value) + 10); weightRange.value = weightInput.value; renderEstimate(); });
   addCalorieButton.addEventListener('click', () => {
@@ -537,7 +602,8 @@ function setupCalorieCalculator() {
     }
     const [food, per100] = currentFood();
     const weight = Math.max(1, Number(weightInput.value) || 1);
-    const kcal = Math.round(per100 * weight / 100);
+    const oil = calorieState.category === 'drink' ? 0 : Math.max(0, Number(oilInput.value) || 0);
+    const kcal = Math.round(per100 * weight / 100 + oil * 9);
     if (!Object.prototype.hasOwnProperty.call(calorieState.baseRecords, calorieState.meal)) {
       const existing = diaryRecords['2026-08-19'][calorieState.meal];
       calorieState.baseRecords[calorieState.meal] = existing ? { ...existing } : null;
@@ -548,8 +614,11 @@ function setupCalorieCalculator() {
       food,
       weight,
       unit: currentUnit(),
+      oil,
       kcal
     });
+    oilInput.value = '0';
+    calorieState.cookingOil = 0;
     mealDates.add('2026-08-19');
     renderLog();
     react('热量记录已保存');
