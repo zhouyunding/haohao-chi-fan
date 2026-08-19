@@ -1,4 +1,45 @@
-const diaryRecords = { '2026-08-19': {} };
+const STORAGE_KEY = 'haohao-chi-fan:data:v1';
+const USER_KEY = 'haohao-chi-fan:user-id';
+const visitorId = (() => {
+  try {
+    let id = localStorage.getItem(USER_KEY);
+    if (!id) {
+      const cryptoApi = globalThis.crypto;
+      id = `guest-${cryptoApi?.randomUUID ? cryptoApi.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
+      localStorage.setItem(USER_KEY, id);
+    }
+    return id;
+  } catch (error) {
+    return 'guest-local';
+  }
+})();
+function readPersistedData() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    return saved && saved.userId === visitorId ? saved : {};
+  } catch (error) {
+    return {};
+  }
+}
+const persistedData = readPersistedData();
+const diaryRecords = persistedData.diaryRecords && typeof persistedData.diaryRecords === 'object'
+  ? persistedData.diaryRecords
+  : {};
+if (!diaryRecords['2026-08-19']) diaryRecords['2026-08-19'] = {};
+function persistData() {
+  try {
+    const payload = {
+      version: 1,
+      userId: visitorId,
+      diaryRecords,
+      calorieLog: typeof calorieState !== 'undefined' ? calorieState.log : (persistedData.calorieLog || []),
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    if (error.name === 'QuotaExceededError') say('照片太大，建议压缩后再上传');
+  }
+}
 
 const mealOrder = ['breakfast', 'lunch', 'dinner'];
 const mealLabels = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
@@ -129,8 +170,7 @@ document.querySelectorAll('.upload input').forEach((input) => {
     const file = input.files && input.files[0];
     if (!file) return;
     const meal = input.closest('.meal').dataset.meal;
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
+    const savePhoto = (photoData) => {
       const existing = diaryRecords['2026-08-19'][meal] || {};
       const existingPhotos = Array.isArray(existing.photos) && existing.photos.length
         ? existing.photos
@@ -140,10 +180,26 @@ document.querySelectorAll('.upload input').forEach((input) => {
       diaryRecords['2026-08-19'][meal] = {
         title: `${mealLabels[meal]}照片`,
         note: '图片已保存，食物内容等待确认。',
-        photos: [...existingPhotos, reader.result]
+        photos: [...existingPhotos, photoData]
       };
       selectedDiaryDate = '2026-08-19';
       renderCuteCalendar();
+      persistData();
+    };
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSide = 1280;
+        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        savePhoto(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      image.onerror = () => savePhoto(reader.result);
+      image.src = reader.result;
     });
     reader.readAsDataURL(file);
   });
@@ -164,6 +220,7 @@ document.querySelector('#save').onclick = () => {
   };
   selectedDiaryDate = '2026-08-19';
   renderCuteCalendar();
+  persistData();
 };
 
 shareButton.addEventListener('click', () => { shareModal.hidden = false; const status = document.querySelector('#shareStatus'); if (status) status.textContent = ''; buzz(); });
@@ -384,6 +441,7 @@ const calorieState = {
   log: [],
   baseRecords: {}
 };
+if (Array.isArray(persistedData.calorieLog)) calorieState.log = persistedData.calorieLog;
 
 function refreshMealProgress() {
   const records = diaryRecords['2026-08-19'] || {};
@@ -557,6 +615,7 @@ function setupCalorieCalculator() {
     });
     refreshMealProgress();
     renderCuteCalendar();
+    persistData();
 
     if (!calorieState.log.length) {
       logContainer.innerHTML = '<div class="calorie-empty">还没有热量记录。</div>';
