@@ -76,6 +76,29 @@
   font: 500 8px var(--cute);
 }
 
+.food-hint {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-left: 2px solid #a78bfa;
+  background: #201a29;
+  color: #bcb3c8;
+  font: 500 9px/1.55 var(--cute);
+}
+
+.food-hint[hidden] {
+  display: none;
+}
+
+.measure-grid {
+  align-items: end;
+}
+
+.label-guide {
+  margin: 0;
+  color: #81798d;
+  font: 500 9px/1.5 var(--cute);
+}
+
 .unit-segment {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -434,6 +434,13 @@ const calorieData = {
     ['牛奶', 54], ['无糖豆浆', 31], ['酸奶', 72], ['咖啡（无糖）', 2]
   ]
 };
+const packagedFoodHints = {
+  '百醇': {
+    category: '零食 / 饼干',
+    unit: 'g',
+    note: '百醇不同口味和规格的能量不同。请填写包装背面“每100g能量”，通常单位是 kJ。'
+  }
+};
 const calorieLabels = { staple: '主食', protein: '蛋白质', vegetable: '蔬果', drink: '饮品', custom: '自定义' };
 const calorieState = {
   meal: 'breakfast',
@@ -444,6 +451,7 @@ const calorieState = {
   customCategory: '',
   customFood: '',
   customPer100: 100,
+  customEnergyUnit: 'kcal',
   customUnit: 'g',
   log: [],
   baseRecords: {}
@@ -490,8 +498,9 @@ function setupCalorieCalculator() {
     <div class="food-field" id="presetFoodField"><label class="calc-label">FOOD</label><select class="food-select" id="foodSelect"></select><div class="food-meta"><span id="foodPer100">每 100g</span><span>常见熟重</span></div></div>
     <div class="custom-food-editor" id="customFoodEditor" hidden>
       <div class="custom-food-grid"><label><span class="calc-label">食物类型</span><input class="calc-input" id="customCategoryInput" type="text" maxlength="16" placeholder="例如：零食、汤品"></label><label><span class="calc-label">食物名称</span><input class="calc-input" id="customFoodInput" type="text" maxlength="24" placeholder="例如：曲奇饼干"></label></div>
-      <div class="custom-energy-grid"><label><span class="calc-label">每 100 单位热量</span><div class="custom-kcal-input"><input class="calc-input" id="customPer100Input" type="number" min="1" max="2000" step="1" value="100"><span>KCAL</span></div></label><div><span class="calc-label">计量单位</span><div class="unit-segment"><button type="button" class="segment-btn is-active" data-custom-unit="g">克</button><button type="button" class="segment-btn" data-custom-unit="ml">毫升</button></div></div></div>
-      <div class="food-meta"><span id="customFoodPer100">每 100g ≈ 100 kcal</span><span>由你填写</span></div>
+      <div class="custom-energy-grid"><label><span class="calc-label">包装标示能量 / 每 100 单位</span><div class="custom-kcal-input"><input class="calc-input" id="customPer100Input" type="number" min="1" max="10000" step="1" value="100"><span id="customEnergySuffix">KCAL</span></div></label><div><span class="calc-label">能量单位</span><div class="unit-segment"><button type="button" class="segment-btn is-active" data-energy-unit="kcal">kcal</button><button type="button" class="segment-btn" data-energy-unit="kj">kJ</button></div></div></div>
+      <div class="custom-energy-grid measure-grid"><div><span class="calc-label">食物计量</span><div class="unit-segment"><button type="button" class="segment-btn is-active" data-custom-unit="g">克</button><button type="button" class="segment-btn" data-custom-unit="ml">毫升</button></div></div><p class="label-guide">照着包装营养成分表填写，系统会自动把 kJ 换算为 kcal。</p></div>
+      <div class="food-meta"><span id="customFoodPer100">每 100g ≈ 100 kcal</span><span>由你填写</span></div><div class="food-hint" id="customFoodHint" hidden></div>
     </div>
     <div class="weight-control"><div class="weight-line"><label class="calc-label" style="margin:0">WEIGHT</label><span class="weight-unit">克 / 毫升</span></div><div class="weight-stepper"><button type="button" id="weightMinus">−</button><input id="weightInput" type="number" min="1" max="2000" step="10" value="150"><button type="button" id="weightPlus">＋</button></div><input class="weight-range" id="weightRange" type="range" min="10" max="800" step="10" value="150"></div>
     <div class="cooking-oil-control" id="cookingOilControl"><div class="oil-line"><label class="calc-label" style="margin:0">COOKING OIL</label><div class="oil-input-wrap"><input class="oil-input" id="oilInput" type="number" min="0" max="100" step="1" value="0" inputmode="decimal"><span class="oil-unit">g · 约 9 kcal/g</span></div></div><small class="oil-note">如果这餐用了炒菜油、橄榄油或沙拉酱，按实际用量补充。</small></div>
@@ -508,6 +517,9 @@ function setupCalorieCalculator() {
   const customFoodInput = panel.querySelector('#customFoodInput');
   const customPer100Input = panel.querySelector('#customPer100Input');
   const customFoodPer100 = panel.querySelector('#customFoodPer100');
+  const customFoodHint = panel.querySelector('#customFoodHint');
+  const customEnergySuffix = panel.querySelector('#customEnergySuffix');
+  const energyUnitButtons = panel.querySelectorAll('[data-energy-unit]');
   const customUnitButtons = panel.querySelectorAll('[data-custom-unit]');
   const weightInput = panel.querySelector('#weightInput');
   const weightRange = panel.querySelector('#weightRange');
@@ -526,7 +538,9 @@ function setupCalorieCalculator() {
 
   function currentFood() {
     if (calorieState.category === 'custom') {
-      return [calorieState.customFood.trim(), Math.max(0, Number(calorieState.customPer100) || 0)];
+      const enteredEnergy = Math.max(0, Number(calorieState.customPer100) || 0);
+      const per100Kcal = calorieState.customEnergyUnit === 'kj' ? enteredEnergy / 4.184 : enteredEnergy;
+      return [calorieState.customFood.trim(), per100Kcal];
     }
     return calorieData[calorieState.category].find(([name]) => name === calorieState.food) || calorieData[calorieState.category][0];
   }
@@ -579,6 +593,14 @@ function setupCalorieCalculator() {
         ? `每 100${currentUnit()} ≈ ${per100} kcal`
         : `填写每 100${currentUnit()} 的热量`;
       weightUnit.textContent = currentUnit() === 'ml' ? '毫升' : '克';
+      const hint = Object.entries(packagedFoodHints).find(([keyword]) => name.includes(keyword))?.[1];
+      if (hint) {
+        customFoodHint.hidden = false;
+        customFoodHint.textContent = hint.note;
+      } else {
+        customFoodHint.hidden = true;
+        customFoodHint.textContent = '';
+      }
     } else {
       foodPer100.textContent = `每 100${currentUnit()} ≈ ${per100} kcal`;
     }
@@ -647,8 +669,25 @@ function setupCalorieCalculator() {
   }));
   foodSelect.addEventListener('change', () => { calorieState.food = foodSelect.value; renderEstimate(); });
   customCategoryInput.addEventListener('input', () => { calorieState.customCategory = customCategoryInput.value; renderEstimate(); });
-  customFoodInput.addEventListener('input', () => { calorieState.customFood = customFoodInput.value; renderEstimate(); });
+  customFoodInput.addEventListener('input', () => {
+    calorieState.customFood = customFoodInput.value;
+    const hint = Object.entries(packagedFoodHints).find(([keyword]) => customFoodInput.value.includes(keyword))?.[1];
+    if (hint) {
+      calorieState.customCategory = hint.category;
+      calorieState.customUnit = hint.unit;
+      customCategoryInput.value = hint.category;
+      customUnitButtons.forEach((item) => item.classList.toggle('is-active', item.dataset.customUnit === hint.unit));
+    }
+    renderEstimate();
+  });
   customPer100Input.addEventListener('input', () => { calorieState.customPer100 = Number(customPer100Input.value) || 0; renderEstimate(); });
+  energyUnitButtons.forEach((button) => button.addEventListener('click', () => {
+    energyUnitButtons.forEach((item) => item.classList.remove('is-active'));
+    button.classList.add('is-active');
+    calorieState.customEnergyUnit = button.dataset.energyUnit;
+    customEnergySuffix.textContent = calorieState.customEnergyUnit === 'kj' ? 'KJ' : 'KCAL';
+    renderEstimate();
+  }));
   customUnitButtons.forEach((button) => button.addEventListener('click', () => {
     customUnitButtons.forEach((item) => item.classList.remove('is-active'));
     button.classList.add('is-active');
